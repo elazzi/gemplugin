@@ -1,11 +1,11 @@
 // Import the VS Code API and the Gemini API client
-import * as vscode from 'vscode';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+const vscode = require('vscode');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // IMPORTANT: Do not hardcode your API key. Use SecretStorage.
-let genAI: GoogleGenerativeAI | undefined;
+let genAI;
 
-export function activate(context: vscode.ExtensionContext) {
+function activate(context) {
 
     // Command to set the API key securely.
     context.subscriptions.push(vscode.commands.registerCommand('gemini-copilot.setApiKey', async () => {
@@ -27,8 +27,8 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.languages.registerInlineCompletionItemProvider(
         ['javascript', 'typescript'],
         {
-            async provideInlineCompletionItems(document, position, inlineContext, token) { // Renamed context to inlineContext
-                const apiKey = await context.secrets.get('geminiApiKey'); // Now correctly refers to ExtensionContext
+            async provideInlineCompletionItems(document, position, inlineContext, token) {
+                const apiKey = await context.secrets.get('geminiApiKey');
                 if (!apiKey) {
                     // Don't show a warning on every keystroke
                     return [];
@@ -110,7 +110,7 @@ User prompt: "${request.prompt}"
         try {
             const result = await model.generateContentStream(fullPrompt);
             for await (const chunk of result.stream) {
-                const chunkText = chunk.text(); // Fixed: call text() method
+                const chunkText = chunk.text();
                 stream.markdown(chunkText);
             }
         } catch (error) {
@@ -121,10 +121,10 @@ User prompt: "${request.prompt}"
 }
 
 // This function is called when your extension is deactivated
-export function deactivate() {}
+function deactivate() {}
 
 // Helper function to find the range of the current function or class
-function findFunctionOrBlockRange(document: vscode.TextDocument, position: vscode.Position): vscode.Range {
+function findFunctionOrBlockRange(document, position) {
     let startLine = position.line;
     let endLine = position.line;
 
@@ -138,3 +138,8 @@ function findFunctionOrBlockRange(document: vscode.TextDocument, position: vscod
 
     return new vscode.Range(startLine, 0, endLine, document.lineAt(endLine).text.length);
 }
+
+module.exports = {
+    activate,
+    deactivate
+};
