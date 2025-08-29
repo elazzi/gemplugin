@@ -14,9 +14,9 @@
     "onLanguage:javascript",
     "onLanguage:typescript",
     "onCommand:gemini-copilot.setApiKey",
-    "onChatParticipant:gemini.chatParticipant"
+    "onChatParticipant:tutor.chatParticipant"
   ],
-  "main": "./out/extension.js",
+  "main": "./extension.js",
   "contributes": {
     "commands": [
       {
@@ -25,28 +25,30 @@
         "category": "Gemini Copilot"
       }
     ],
-    "chatParticipants": [
+        "chatParticipants": [
       {
         "id": "gemini.chatParticipant",
-        "name": "Gemini"
+        "name": "CodeTutor",
+        "description": "tutor",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "explain",
+            "description": "Explain the selected code"
+          },
+          {
+            "name": "fix",
+            "description": "Suggest a fix for the selected code"
+          }
+        ]
       }
     ]
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
-  },
-  "devDependencies": {
-    "@types/node": "18.x",
-    "@types/vscode": "^1.85.0",
-    "eslint": "^8.57.0",
-    "globals": "^16.3.0",
-    "typescript": "^5.3.3",
-    "typescript-eslint": "^8.41.0"
   },
   "dependencies": {
     "@google/generative-ai": "^0.1.0"
   }
 }
+
+
+
+  
