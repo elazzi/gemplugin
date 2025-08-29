@@ -1,0 +1,38 @@
+{
+  "name": "gemini-copilot",
+  "displayName": "Gemini Copilot",
+  "description": "A VS Code extension to provide Copilot-like functionality using the Gemini API.",
+  "version": "0.0.1",
+  "publisher": "vscode-developer",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onCommand:gemini-copilot.setApiKey",
+    "onChatParticipant:gemini.chatParticipant"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "gemini-copilot.setApiKey",
+        "title": "Gemini Copilot: Set API Key",
+        "category": "Gemini Copilot"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "gemini.chatParticipant",
+        "name": "Gemini"
+      }
+    ]
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.1.0"
+  }
+}
