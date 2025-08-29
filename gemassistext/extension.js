@@ -304,7 +304,7 @@ function registerInlineCompletionProvider(context) {
                 return [];
             }
         }
-    ));
+    );
 }
 
 function deactivate() {}
