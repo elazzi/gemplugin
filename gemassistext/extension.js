@@ -8,13 +8,17 @@ let genAI;
 const diffContentStore = new Map();
 const diffFixStore = new Map();
 let acceptButton, discardButton;
+let inlineCompletionProvider, chatParticipant;
 
 async function activate(context) {
     console.log('Congratulations, your extension "gemini-copilot" is now active!');
 
     setupDiffView(context);
     registerCommands(context);
+    registerInlineCompletionProvider(context);
+    context.subscriptions.push(inlineCompletionProvider);
     registerChatParticipant(context);
+    context.subscriptions.push(chatParticipant);
 
     // Attempt to initialize the Gemini client on activation
     await initializeGenAI(context);
@@ -84,6 +88,9 @@ function registerCommands(context) {
             const success = await initializeGenAI(context);
             if (success) {
                 vscode.window.showInformationMessage('Gemini API key saved and client initialized!');
+                // Re-register providers to use the new client
+                registerInlineCompletionProvider(context);
+                registerChatParticipant(context);
             }
         }
     }));
@@ -91,10 +98,17 @@ function registerCommands(context) {
     context.subscriptions.push(vscode.commands.registerCommand('gemini-copilot.acceptFix', async () => {
         const uuid = await vscode.commands.executeCommand('getContext', 'gemini.diffId');
         if (diffFixStore.has(uuid)) {
-            const { editor, selection, suggestedCode } = diffFixStore.get(uuid);
+            const { uri, selection, suggestedCode } = diffFixStore.get(uuid);
+            const document = await vscode.workspace.openTextDocument(uri);
+            let editor = vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === uri.toString());
+            if (!editor) {
+                editor = await vscode.window.showTextDocument(document);
+            }
+
             editor.edit(editBuilder => {
                 editBuilder.replace(selection, suggestedCode);
             });
+
             diffFixStore.delete(uuid);
             vscode.window.tabGroups.all.forEach(group => group.tabs.forEach(tab => {
                 if (tab.input instanceof vscode.TabInputTextDiff && tab.input.original.scheme === 'gemini-diff') {
@@ -115,6 +129,43 @@ function registerCommands(context) {
             }));
         }
     }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('gemini-copilot.generateInNewFile', async () => {
+        const prompt = await vscode.window.showInputBox({
+            prompt: 'What do you want to generate?',
+            placeHolder: 'e.g., a python flask server'
+        });
+
+        if (prompt) {
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+            const fullPrompt = `Generate a complete code file for the following request: "${prompt}". Your response should be a single JSON object with two keys: "language" (e.g., "python", "javascript") and "code" (the full code content).`;
+
+            try {
+                const result = await model.generateContent(fullPrompt);
+                const responseText = result.response.text();
+
+                let jsonResponse;
+                try {
+                    jsonResponse = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('Failed to parse JSON response from Gemini:', responseText);
+                    vscode.window.showErrorMessage('I received an invalid response from the API. I cannot create the file.');
+                    return;
+                }
+
+                const { language, code } = jsonResponse;
+
+                const newDocument = await vscode.workspace.openTextDocument({
+                    content: code,
+                    language: language || 'untitled'
+                });
+                await vscode.window.showTextDocument(newDocument);
+            } catch (error) {
+                console.error('Error generating code in new file:', error);
+                vscode.window.showErrorMessage('Failed to generate code. Please check the extension logs.');
+            }
+        }
+    }));
 }
 
 async function initializeGenAI(context) {
@@ -127,7 +178,10 @@ async function initializeGenAI(context) {
 }
 
 function registerChatParticipant(context) {
-    context.subscriptions.push(vscode.chat.createChatParticipant('gemini.chatParticipant', async (request, chatContext, stream, token) => {
+    if (chatParticipant) {
+        chatParticipant.dispose();
+    }
+    chatParticipant = vscode.chat.createChatParticipant('gemini.chatParticipant', async (request, chatContext, stream, token) => {
         if (!genAI) {
             const initialized = await initializeGenAI(context);
             if (!initialized) {
@@ -136,7 +190,7 @@ function registerChatParticipant(context) {
             }
         }
         
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
         
         const editor = vscode.window.activeTextEditor;
         const selection = editor ? editor.document.getText(editor.selection) : '';
@@ -165,7 +219,8 @@ function registerChatParticipant(context) {
 
                 try {
                     stream.markdown('Analyzing the code and preparing a suggestion...');
-                    const result = await model.generateContent(userPrompt);
+
+                    const result = await model.generateContent([systemInstruction, userPrompt]);
                     const responseText = result.response.text();
 
                     let jsonResponse;
@@ -192,7 +247,7 @@ function registerChatParticipant(context) {
 
                     diffContentStore.set(originalUri.toString(), selection);
                     diffContentStore.set(suggestedUri.toString(), suggestedCode);
-                    diffFixStore.set(uuid, { editor, selection, suggestedCode });
+                    diffFixStore.set(uuid, { uri: editor.document.uri, selection, suggestedCode });
 
                     await vscode.commands.executeCommand('vscode.diff', originalUri, suggestedUri, `Suggestion for ${fileName}`);
                 } catch (error) {
@@ -215,7 +270,41 @@ function registerChatParticipant(context) {
             console.error('Error in chat participant:', error);
             stream.markdown('I apologize, but I encountered an error. Please check the extension logs for details.');
         }
-    }));
+    });
+}
+
+function registerInlineCompletionProvider(context) {
+    if (inlineCompletionProvider) {
+        inlineCompletionProvider.dispose();
+    }
+    inlineCompletionProvider = vscode.languages.registerInlineCompletionItemProvider(
+        ['javascript', 'typescript','python','java','csharp','cpp','ruby','go','php'],
+        {
+            async provideInlineCompletionItems(document, position, context, token) {
+                if (!genAI) return [];
+
+                const linePrefix = document.lineAt(position).text.substring(0, position.character);
+                if (!linePrefix.trim().startsWith('//')) return [];
+
+                const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+                const functionRange = findFunctionOrBlockRange(document, position);
+                const codeContext = document.getText(functionRange);
+
+                const prompt = `You are a helpful AI coding assistant. Generate a complete and correct code snippet based on the user's comment. Provide only the code, with no extra explanation or markdown. The code should fit perfectly into the existing file.\n\nFile: ${document.fileName}\n\nCurrent code block:\n\`\`\`${document.languageId}\n${codeContext}\n\`\`\`\n\nUser comment: "${linePrefix.trim()}"\n\nGenerated code:\n`;
+
+                try {
+                    const result = await model.generateContent(prompt);
+                    const text = result.response.text();
+                    if (text) {
+                        return [{ insertText: text, range: new vscode.Range(position, position) }];
+                    }
+                } catch (error) {
+                    console.error('Error generating inline completion from Gemini API:', error);
+                }
+                return [];
+            }
+        }
+    ));
 }
 
 function deactivate() {}
