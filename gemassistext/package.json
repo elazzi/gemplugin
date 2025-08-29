@@ -14,10 +14,28 @@
     "onLanguage:javascript",
     "onLanguage:typescript",
     "onCommand:gemini-copilot.setApiKey",
-    "onChatParticipant:tutor.chatParticipant"
+    "onChatParticipant:gemini.chatParticipant"
   ],
   "main": "./extension.js",
   "contributes": {
+    "chatParticipants": [
+        {
+            "id": "gemini.chatParticipant",
+            "name": "CodeTutor",
+            "description": "tutor",
+            "isSticky": true,
+            "commands": [
+                {
+                    "name": "explain",
+                    "description": "Explain the selected code"
+                },
+                {
+                    "name": "fix",
+                    "description": "Suggest a fix for the selected code"
+                }
+            ]
+        }
+    ],
     "commands": [
       {
         "command": "gemini-copilot.setApiKey",
@@ -35,24 +53,6 @@
         "command": "gemini-copilot.generateInNewFile",
         "key": "ctrl+i",
         "mac": "cmd+i"
-      }
-    ],
-    "chatParticipants": [
-      {
-        "id": "gemini.chatParticipant",
-        "name": "CodeTutor",
-        "description": "tutor",
-        "isSticky": true,
-        "commands": [
-          {
-            "name": "explain",
-            "description": "Explain the selected code"
-          },
-          {
-            "name": "fix",
-            "description": "Suggest a fix for the selected code"
-          }
-        ]
       }
     ]
   },
