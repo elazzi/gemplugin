@@ -43,7 +43,6 @@
         "name": "CodeTutor",
         "description": "tutor",
         "isSticky": true,
-        "isDefault": true,
         "commands": [
           {
             "name": "explain",
