@@ -43,6 +43,7 @@
         "name": "CodeTutor",
         "description": "tutor",
         "isSticky": true,
+        "isDefault": true,
         "commands": [
           {
             "name": "explain",
@@ -60,7 +61,3 @@
     "@google/generative-ai": "^0.1.0"
   }
 }
-
-
-
-  
