@@ -16,9 +16,7 @@ async function activate(context) {
     setupDiffView(context);
     registerCommands(context);
     registerInlineCompletionProvider(context);
-    context.subscriptions.push(inlineCompletionProvider);
     registerChatParticipant(context);
-    context.subscriptions.push(chatParticipant);
 
     // Attempt to initialize the Gemini client on activation
     await initializeGenAI(context);
@@ -137,7 +135,7 @@ function registerCommands(context) {
         });
 
         if (prompt) {
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
             const fullPrompt = `Generate a complete code file for the following request: "${prompt}". Your response should be a single JSON object with two keys: "language" (e.g., "python", "javascript") and "code" (the full code content).`;
 
             try {
@@ -190,7 +188,7 @@ function registerChatParticipant(context) {
             }
         }
         
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
         
         const editor = vscode.window.activeTextEditor;
         const selection = editor ? editor.document.getText(editor.selection) : '';
@@ -271,6 +269,7 @@ function registerChatParticipant(context) {
             stream.markdown('I apologize, but I encountered an error. Please check the extension logs for details.');
         }
     });
+    context.subscriptions.push(chatParticipant);
 }
 
 function registerInlineCompletionProvider(context) {
@@ -286,7 +285,7 @@ function registerInlineCompletionProvider(context) {
                 const linePrefix = document.lineAt(position).text.substring(0, position.character);
                 if (!linePrefix.trim().startsWith('//')) return [];
 
-                const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
                 const functionRange = findFunctionOrBlockRange(document, position);
                 const codeContext = document.getText(functionRange);
 
@@ -305,6 +304,7 @@ function registerInlineCompletionProvider(context) {
             }
         }
     ));
+    context.subscriptions.push(inlineCompletionProvider);
 }
 
 function deactivate() {}
