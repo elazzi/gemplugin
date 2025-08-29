@@ -23,9 +23,21 @@
         "command": "gemini-copilot.setApiKey",
         "title": "Gemini Copilot: Set API Key",
         "category": "Gemini Copilot"
+      },
+      {
+        "command": "gemini-copilot.generateInNewFile",
+        "title": "Gemini Copilot: Generate Code in New File",
+        "category": "Gemini Copilot"
       }
     ],
-        "chatParticipants": [
+    "keybindings": [
+      {
+        "command": "gemini-copilot.generateInNewFile",
+        "key": "ctrl+i",
+        "mac": "cmd+i"
+      }
+    ],
+    "chatParticipants": [
       {
         "id": "gemini.chatParticipant",
         "name": "CodeTutor",
