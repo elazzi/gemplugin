@@ -14,10 +14,29 @@
     "onLanguage:javascript",
     "onLanguage:typescript",
     "onCommand:gemini-copilot.setApiKey",
-    "onChatParticipant:gemini.chatParticipant"
+    "onChatParticipant:gemini.chatParticipant",
+    "onView:geminiChatView"
   ],
   "main": "./extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gemini-copilot-container",
+          "title": "Gemini Copilot",
+          "icon": "./gemini-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "gemini-copilot-container": [
+        {
+          "id": "geminiChatView",
+          "name": "Gemini Chat",
+          "type": "webview"
+        }
+      ]
+    },
     "chatParticipants": [
         {
             "id": "gemini.chatParticipant",
