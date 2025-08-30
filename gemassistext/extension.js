@@ -316,6 +316,7 @@ function registerInlineCompletionProvider(context) {
 class GeminiChatViewProvider {
     constructor(context) {
         this.context = context;
+        this.contextFiles = [];
     }
 
     resolveWebviewView(webviewView, context, token) {
@@ -336,44 +337,88 @@ class GeminiChatViewProvider {
         webviewView.webview.html = htmlContent;
 
         webviewView.webview.onDidReceiveMessage(async message => {
-            if (message.command === 'new-message') {
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-                const prompt = `You are a helpful coding assistant. Respond to the user's request. If you are providing code, format your response as a single JSON object with two keys: "language" and "code". If you are providing a natural language response, just respond with the text.\n\nUser request: "${message.text}"`;
-                const result = await model.generateContent(prompt);
-                const response = await result.response;
-                const text = response.text();
-                this.webviewView.webview.postMessage({ command: 'new-message-response', text: text });
-            } else if (message.command === 'create-new-file') {
-                const newDocument = await vscode.workspace.openTextDocument({
-                    content: message.code,
-                    language: message.language
-                });
-                await vscode.window.showTextDocument(newDocument);
-            } else if (message.command === 'merge-into-file') {
-                const openEditors = vscode.window.visibleTextEditors;
-                const items = openEditors.map(editor => ({
-                    label: path.basename(editor.document.fileName),
-                    description: editor.document.fileName,
-                    document: editor.document
-                }));
+            switch (message.command) {
+                case 'new-message':
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-                const selected = await vscode.window.showQuickPick(items, {
-                    placeHolder: 'Select a file to merge into'
-                });
+                    let contextString = '';
+                    if (this.contextFiles.length > 0) {
+                        contextString = "Use the following file contents as context to answer the user's question.\n\n";
+                        this.contextFiles.forEach(file => {
+                            contextString += `--- CONTEXT FILE: ${file.name} ---\n${file.content}\n\n`;
+                        });
+                        contextString += "--- END OF CONTEXT ---\n\n";
+                    }
 
-                if (selected) {
-                    const editor = await vscode.window.showTextDocument(selected.document);
-                    vscode.window.showInformationMessage('Please select the code you want to replace.');
+                    const prompt = `${contextString}You are a helpful coding assistant. Respond to the user's request. If you are providing code, format your response as a single JSON object with two keys: "language" and "code". If you are providing a natural language response, just respond with the text.\n\nUser request: "${message.text}"`;
 
-                    const disposable = vscode.window.onDidChangeTextEditorSelection(async e => {
-                        if (e.textEditor === editor && e.selections[0].start.isEqual(e.selections[0].end) === false) {
-                            await editor.edit(editBuilder => {
-                                editBuilder.replace(e.selections[0], message.code);
-                            });
-                            disposable.dispose();
-                        }
+                    const result = await model.generateContent(prompt);
+                    const response = await result.response;
+                    const text = response.text();
+                    this.webviewView.webview.postMessage({ command: 'new-message-response', text: text });
+                    break;
+                case 'clear-context-files':
+                    this.contextFiles = [];
+                    break;
+                case 'create-new-file':
+                    const newDocument = await vscode.workspace.openTextDocument({
+                        content: message.code,
+                        language: message.language
                     });
-                }
+                    await vscode.window.showTextDocument(newDocument);
+                    break;
+                case 'merge-into-file':
+                    const openEditors = vscode.window.visibleTextEditors;
+                    const items = openEditors.map(editor => ({
+                        label: path.basename(editor.document.fileName),
+                        description: editor.document.fileName,
+                        document: editor.document
+                    }));
+
+                    const selected = await vscode.window.showQuickPick(items, {
+                        placeHolder: 'Select a file to merge into'
+                    });
+
+                    if (selected) {
+                        const editor = await vscode.window.showTextDocument(selected.document);
+                        vscode.window.showInformationMessage('Please select the code you want to replace.');
+
+                        const disposable = vscode.window.onDidChangeTextEditorSelection(async e => {
+                            if (e.textEditor === editor && e.selections[0].start.isEqual(e.selections[0].end) === false) {
+                                await editor.edit(editBuilder => {
+                                    editBuilder.replace(e.selections[0], message.code);
+                                });
+                                disposable.dispose();
+                            }
+                        });
+                    }
+                    break;
+                case 'add-context-files':
+                    const uris = await vscode.window.showOpenDialog({
+                        canSelectMany: true,
+                        openLabel: 'Add as Context'
+                    });
+                    if (uris) {
+                        for (const uri of uris) {
+                            const content = await vscode.workspace.fs.readFile(uri);
+                            this.contextFiles.push({
+                                name: path.basename(uri.fsPath),
+                                content: content.toString()
+                            });
+                        }
+                        this.webviewView.webview.postMessage({
+                            command: 'update-context-files',
+                            files: this.contextFiles.map(f => f.name)
+                        });
+                    }
+                    break;
+                case 'remove-context-file':
+                    this.contextFiles.splice(message.index, 1);
+                    this.webviewView.webview.postMessage({
+                        command: 'update-context-files',
+                        files: this.contextFiles.map(f => f.name)
+                    });
+                    break;
             }
         });
     }

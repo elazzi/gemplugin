@@ -20,9 +20,37 @@ body, html {
     margin-bottom: 10px;
 }
 
+#context-container {
+    padding: 5px;
+    border-top: 1px solid var(--vscode-editor-foreground);
+}
+
+#context-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+.context-file-pill {
+    background-color: var(--vscode-button-secondary-background);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+}
+
+.context-file-pill button {
+    background: none;
+    border: none;
+    color: var(--vscode-editor-foreground);
+    margin-left: 5px;
+    cursor: pointer;
+}
+
 #input-container {
     display: flex;
-    border-top: 1px solid var(--vscode-editor-foreground);
     padding-top: 10px;
 }
 

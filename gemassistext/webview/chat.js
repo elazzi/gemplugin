@@ -1,9 +1,23 @@
 (function () {
     const vscode = acquireVsCodeApi();
+    let contextFiles = [];
 
     const messageContainer = document.getElementById('message-container');
     const promptInput = document.getElementById('prompt-input');
     const sendButton = document.getElementById('send-button');
+    const addContextButton = document.getElementById('add-context-button');
+    const clearContextButton = document.getElementById('clear-context-button');
+    const contextFilesContainer = document.getElementById('context-files');
+
+    addContextButton.addEventListener('click', () => {
+        vscode.postMessage({ command: 'add-context-files' });
+    });
+
+    clearContextButton.addEventListener('click', () => {
+        contextFiles = [];
+        renderContextFiles();
+        vscode.postMessage({ command: 'clear-context-files' });
+    });
 
     sendButton.addEventListener('click', () => {
         const prompt = promptInput.value;
@@ -22,9 +36,30 @@
         }
     });
 
+    function renderContextFiles() {
+        contextFilesContainer.innerHTML = '';
+        contextFiles.forEach((file, index) => {
+            const pill = document.createElement('div');
+            pill.className = 'context-file-pill';
+            pill.textContent = file;
+
+            const removeButton = document.createElement('button');
+            removeButton.textContent = 'x';
+            removeButton.addEventListener('click', () => {
+                vscode.postMessage({ command: 'remove-context-file', index: index });
+            });
+            pill.appendChild(removeButton);
+            contextFilesContainer.appendChild(pill);
+        });
+    }
+
     window.addEventListener('message', event => {
         const message = event.data;
         switch (message.command) {
+            case 'update-context-files':
+                contextFiles = message.files;
+                renderContextFiles();
+                break;
             case 'new-message-response':
                 let response;
                 try {
