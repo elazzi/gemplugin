@@ -2,6 +2,8 @@
 const vscode = require('vscode');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 // Module-level variable to hold the initialized Gemini client
 let genAI;
@@ -17,6 +19,10 @@ async function activate(context) {
     registerCommands(context);
     registerInlineCompletionProvider(context);
     registerChatParticipant(context);
+
+    const webviewProvider = new GeminiChatViewProvider(context);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider("geminiChatView", webviewProvider));
 
     // Attempt to initialize the Gemini client on activation
     await initializeGenAI(context);
@@ -303,8 +309,74 @@ function registerInlineCompletionProvider(context) {
                 return [];
             }
         }
+    ));
+    context.subscriptions.push(inlineCompletionProvider);
+}
 
-    );
+class GeminiChatViewProvider {
+    constructor(context) {
+        this.context = context;
+    }
+
+    resolveWebviewView(webviewView, context, token) {
+        this.webviewView = webviewView;
+
+        webviewView.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [vscode.Uri.file(path.join(this.context.extensionPath, 'webview'))]
+        };
+
+        const htmlPath = path.join(this.context.extensionPath, 'webview', 'chat.html');
+        let htmlContent = fs.readFileSync(htmlPath, 'utf8');
+
+        const scriptUri = webviewView.webview.asWebviewUri(vscode.Uri.file(path.join(this.context.extensionPath, 'webview', 'chat.js')));
+        const styleUri = webviewView.webview.asWebviewUri(vscode.Uri.file(path.join(this.context.extensionPath, 'webview', 'chat.css')));
+
+        htmlContent = htmlContent.replace('${scriptUri}', scriptUri).replace('${styleUri}', styleUri);
+        webviewView.webview.html = htmlContent;
+
+        webviewView.webview.onDidReceiveMessage(async message => {
+            if (message.command === 'new-message') {
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+                const prompt = `You are a helpful coding assistant. Respond to the user's request. If you are providing code, format your response as a single JSON object with two keys: "language" and "code". If you are providing a natural language response, just respond with the text.\n\nUser request: "${message.text}"`;
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                const text = response.text();
+                this.webviewView.webview.postMessage({ command: 'new-message-response', text: text });
+            } else if (message.command === 'create-new-file') {
+                const newDocument = await vscode.workspace.openTextDocument({
+                    content: message.code,
+                    language: message.language
+                });
+                await vscode.window.showTextDocument(newDocument);
+            } else if (message.command === 'merge-into-file') {
+                const openEditors = vscode.window.visibleTextEditors;
+                const items = openEditors.map(editor => ({
+                    label: path.basename(editor.document.fileName),
+                    description: editor.document.fileName,
+                    document: editor.document
+                }));
+
+                const selected = await vscode.window.showQuickPick(items, {
+                    placeHolder: 'Select a file to merge into'
+                });
+
+                if (selected) {
+                    const editor = await vscode.window.showTextDocument(selected.document);
+                    vscode.window.showInformationMessage('Please select the code you want to replace.');
+
+                    const disposable = vscode.window.onDidChangeTextEditorSelection(async e => {
+                        if (e.textEditor === editor && e.selections[0].start.isEqual(e.selections[0].end) === false) {
+                            await editor.edit(editBuilder => {
+                                editBuilder.replace(e.selections[0], message.code);
+                            });
+                            disposable.dispose();
+                        }
+                    });
+                }
+            }
+        });
+    }
 }
 
 function deactivate() {}
