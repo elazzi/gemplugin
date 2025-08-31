@@ -309,7 +309,7 @@ function registerInlineCompletionProvider(context) {
                 return [];
             }
         }
-    );
+    ));
     context.subscriptions.push(inlineCompletionProvider);
 }
 
@@ -340,11 +340,20 @@ class GeminiChatViewProvider {
         webviewView.webview.onDidReceiveMessage(async message => {
             switch (message.command) {
                 case 'new-message':
+                    console.log('Context files:', this.contextFiles);
                     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
                     let contextString = '';
+                    const activeEditor = vscode.window.activeTextEditor;
+                    if (activeEditor) {
+                        const document = activeEditor.document;
+                        contextString += `--- CONTEXT FILE (Currently Open): ${path.basename(document.fileName)} ---\n${document.getText()}\n\n`;
+                    }
+
                     if (this.contextFiles.length > 0) {
-                        contextString = "Use the following file contents as context to answer the user's question.\n\n";
+                        if (contextString === '') {
+                            contextString = "Use the following file contents as context to answer the user's question.\n\n";
+                        }
                         this.contextFiles.forEach(file => {
                             contextString += `--- CONTEXT FILE: ${file.name} ---\n${file.content}\n\n`;
                         });
@@ -353,6 +362,7 @@ class GeminiChatViewProvider {
 
                     const prompt = `${contextString}You are a helpful coding assistant. Respond to the user's request. If you are providing code, format your response as a single JSON object with two keys: "language" and "code". If you are providing a natural language response, just respond with the text.\n\nUser request: "${message.text}"`;
 
+                    console.log('Final prompt:', prompt);
                     const result = await model.generateContent(prompt);
                     const response = await result.response;
                     const text = response.text();
