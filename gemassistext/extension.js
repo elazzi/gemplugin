@@ -309,7 +309,7 @@ function registerInlineCompletionProvider(context) {
                 return [];
             }
         }
-    ));
+    );
     context.subscriptions.push(inlineCompletionProvider);
 }
 
