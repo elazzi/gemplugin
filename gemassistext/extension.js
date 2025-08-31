@@ -332,8 +332,9 @@ class GeminiChatViewProvider {
 
         const scriptUri = webviewView.webview.asWebviewUri(vscode.Uri.file(path.join(this.context.extensionPath, 'webview', 'chat.js')));
         const styleUri = webviewView.webview.asWebviewUri(vscode.Uri.file(path.join(this.context.extensionPath, 'webview', 'chat.css')));
+        const markedUri = webviewView.webview.asWebviewUri(vscode.Uri.file(path.join(this.context.extensionPath, 'webview', 'marked.js')));
 
-        htmlContent = htmlContent.replace('${scriptUri}', scriptUri).replace('${styleUri}', styleUri);
+        htmlContent = htmlContent.replace('${scriptUri}', scriptUri).replace('${styleUri}', styleUri).replace('${markedUri}', markedUri);
         webviewView.webview.html = htmlContent;
 
         webviewView.webview.onDidReceiveMessage(async message => {
@@ -355,7 +356,16 @@ class GeminiChatViewProvider {
                     const result = await model.generateContent(prompt);
                     const response = await result.response;
                     const text = response.text();
-                    this.webviewView.webview.postMessage({ command: 'new-message-response', text: text });
+
+                    let isJsonResponse = false;
+                    try {
+                        JSON.parse(text);
+                        isJsonResponse = true;
+                    } catch (e) {
+                        // Not a JSON response
+                    }
+
+                    this.webviewView.webview.postMessage({ command: 'new-message-response', text: text, isJson: isJsonResponse });
                     break;
                 case 'clear-context-files':
                     this.contextFiles = [];
