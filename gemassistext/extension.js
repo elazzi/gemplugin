@@ -310,7 +310,6 @@ function registerInlineCompletionProvider(context) {
             }
         }
     ));
-    context.subscriptions.push(inlineCompletionProvider);
 }
 
 class GeminiChatViewProvider {
